@@ -139,15 +139,20 @@
     }
 
     const ALCOHOL_DENSITY = 0.789;
-    const METABOLISM_RATE = 0.015;
+    const METABOLISM_RATE = {
+      weak: 0.010,      // 弱い: 1時間あたり0.010%代謝
+      normal: 0.015,    // 普通: 1時間あたり0.015%代謝
+      strong: 0.020,    // 強い: 1時間あたり0.020%代謝
+    };
     const DISTRIBUTION_VOLUME = { male: 0.68, female: 0.55 };
 
-    function calculateBAC(pureAlcoholMl, weightKg, gender, hoursElapsed) {
+    function calculateBAC(pureAlcoholMl, weightKg, gender, hoursElapsed, tolerance = 'normal') {
       const alcoholGrams = pureAlcoholMl * ALCOHOL_DENSITY;
       const r = DISTRIBUTION_VOLUME[gender];
+      const metabolismRate = METABOLISM_RATE[tolerance] || METABOLISM_RATE.normal;
       // Widmark式: BAC(%) = アルコール量(g) / (体重(kg) × 分布容積) - 代謝速度 × 時間
       // 結果は%単位（0.05 = 0.05%）
-      const bac = (alcoholGrams / (weightKg * r * 10)) - (METABOLISM_RATE * hoursElapsed);
+      const bac = (alcoholGrams / (weightKg * r * 10)) - (metabolismRate * hoursElapsed);
       return Math.max(0, bac);
     }
 
@@ -166,7 +171,8 @@
           calculatePureAlcohol(record.volumeMl, record.alcoholPercentage),
           userProfile.weight,
           userProfile.gender,
-          hoursElapsed
+          hoursElapsed,
+          userProfile.tolerance || 'normal'
         );
         totalBAC += bac;
       });
@@ -336,7 +342,8 @@
         };
 
         updateBAC();
-        const interval = setInterval(updateBAC, 60000);
+        // 10秒ごとに更新（よりリアルタイムに）
+        const interval = setInterval(updateBAC, 10000);
         return () => clearInterval(interval);
       }, [records, userProfile]);
 
@@ -518,6 +525,7 @@
     function UserSettingsModal({ isOpen, onClose, onSave, currentProfile }) {
       const [weight, setWeight] = useState(currentProfile?.weight || 60);
       const [gender, setGender] = useState(currentProfile?.gender || 'male');
+      const [tolerance, setTolerance] = useState(currentProfile?.tolerance || 'normal');
       const [error, setError] = useState('');
 
       const handleSave = () => {
@@ -528,6 +536,7 @@
         onSave({
           weight: parseFloat(weight),
           gender,
+          tolerance,
           createdAt: currentProfile?.createdAt || new Date().toISOString(),
         });
         setError('');
@@ -556,6 +565,24 @@
                   女性
                 </label>
               </div>
+            </div>
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-2" style={{ color: THEME_COLORS.text }}>アルコール代謝能力</label>
+              <div className="flex gap-2">
+                <label className="flex-1 flex items-center justify-center py-2 px-3 border-2 rounded-lg cursor-pointer" style={{ borderColor: tolerance === 'weak' ? THEME_COLORS.secondary : '#ddd', backgroundColor: tolerance === 'weak' ? THEME_COLORS.background : 'white' }}>
+                  <input type="radio" value="weak" checked={tolerance === 'weak'} onChange={(e) => setTolerance(e.target.value)} className="mr-2" />
+                  弱い
+                </label>
+                <label className="flex-1 flex items-center justify-center py-2 px-3 border-2 rounded-lg cursor-pointer" style={{ borderColor: tolerance === 'normal' ? THEME_COLORS.secondary : '#ddd', backgroundColor: tolerance === 'normal' ? THEME_COLORS.background : 'white' }}>
+                  <input type="radio" value="normal" checked={tolerance === 'normal'} onChange={(e) => setTolerance(e.target.value)} className="mr-2" />
+                  普通
+                </label>
+                <label className="flex-1 flex items-center justify-center py-2 px-3 border-2 rounded-lg cursor-pointer" style={{ borderColor: tolerance === 'strong' ? THEME_COLORS.secondary : '#ddd', backgroundColor: tolerance === 'strong' ? THEME_COLORS.background : 'white' }}>
+                  <input type="radio" value="strong" checked={tolerance === 'strong'} onChange={(e) => setTolerance(e.target.value)} className="mr-2" />
+                  強い
+                </label>
+              </div>
+              <p className="text-xs text-gray-500 mt-2">※ 代謝速度: 弱い 0.010%/h、普通 0.015%/h、強い 0.020%/h</p>
             </div>
             {error && <div className="mb-4 text-red-600 text-sm">{error}</div>}
             <div className="flex gap-2">
