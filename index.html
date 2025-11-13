@@ -156,6 +156,12 @@
       records.forEach(record => {
         const drinkTime = new Date(record.timestamp);
         const hoursElapsed = (currentTime.getTime() - drinkTime.getTime()) / (1000 * 60 * 60);
+        
+        // 飲酒時刻より前の時点では、そのお酒の影響はまだない
+        if (hoursElapsed < 0) {
+          return; // この飲み物はまだ飲んでいない
+        }
+        
         const bac = calculateBAC(
           calculatePureAlcohol(record.volumeMl, record.alcoholPercentage),
           userProfile.weight,
@@ -171,9 +177,15 @@
       if (records.length === 0) return [];
       const dataPoints = [];
       const now = new Date();
+      
+      // 最初の飲酒時刻を取得
       const firstDrinkTime = new Date(Math.min(...records.map(r => new Date(r.timestamp).getTime())));
-      const startTime = new Date(firstDrinkTime);
+      
+      // 最初の飲酒の1時間前から開始（飲む前の状態を表示）
+      const startTime = new Date(firstDrinkTime.getTime() - 60 * 60 * 1000);
       startTime.setMinutes(Math.floor(startTime.getMinutes() / 15) * 15, 0, 0);
+      
+      // 現在時刻から6時間後まで予測
       const endTime = new Date(now.getTime() + 6 * 60 * 60 * 1000);
 
       for (let time = new Date(startTime); time <= endTime; time.setMinutes(time.getMinutes() + 15)) {
